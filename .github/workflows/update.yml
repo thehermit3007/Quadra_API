@@ -1,0 +1,32 @@
+name: Actualizar Dólar Automático
+
+on:
+  schedule:
+    # 8 AM, 12 PM, 4 PM (hora Venezuela UTC-4)
+    - cron: '0 12,16,20 * * *'  # 12:00, 16:00, 20:00 UTC = 8:00, 12:00, 16:00 VEN
+  workflow_dispatch:
+  push:
+
+jobs:
+  update-dolar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Descargar código
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Configurar permisos
+      run: chmod +x scraper.sh
+      
+    - name: Ejecutar Scraper
+      run: ./scraper.sh
+      
+    - name: Guardar cambios
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        git add data.json
+        git diff --staged --quiet || (git commit -m "Actualizar dólar - $(date +'%d/%m %H:%M')" && git push)
