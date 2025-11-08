@@ -19,10 +19,10 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Configurar permisos
-      run: chmod +x scraper.sh
+      run: chmod +x QuadraAPI.sh
       
     - name: Ejecutar Scraper
-      run: ./scraper.sh
+      run: ./QuadraAPI.sh
       
     - name: Guardar cambios
       run: |
