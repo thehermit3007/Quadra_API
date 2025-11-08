@@ -1,4 +1,4 @@
-# QuadraAP
+# QuadraAPI
 ## Solucion para Consulta del Dólar en Venezuela
 
 Los venezolanos enfrentan diariamente la dificultad de conocer el precio actualizado del dólar para calcular precios de productos y servicios. Las fuentes oficiales no siempre están accesibles o actualizadas, generando frustración en las transacciones cotidianas.
