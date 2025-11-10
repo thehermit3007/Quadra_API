@@ -1,32 +1,28 @@
-name: Actualizar Dólar Automático
+name: Update Dolar Rates
 
 on:
   schedule:
-    # 8 AM, 12 PM, 4 PM (hora Venezuela UTC-4)
-    - cron: '0 12,16,20 * * *'  # 12:00, 16:00, 20:00 UTC = 8:00, 12:00, 16:00 VEN
+    - cron: '0 8,12,16 * * *'  # 8am, 12pm, 4pm UTC
   workflow_dispatch:
-  push:
 
 jobs:
-  update-dolar:
+  update-rates:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    
     steps:
-    - name: Descargar código
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Configurar permisos
-      run: chmod +x QuadraAPI.sh
-      
-    - name: Ejecutar Scraper
-      run: ./QuadraAPI.sh
-      
-    - name: Guardar cambios
-      run: |
-        git config user.name "GitHub Actions Bot"
-        git config user.email "actions@github.com"
-        git add data.json
-        git diff --staged --quiet || (git commit -m "Actualizar dólar - $(date +'%d/%m %H:%M')" && git push)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}   Usar el PAT aquí
+          
+      - name: Run BCV scraper
+        run: |
+          chmod +x ./scripts/update-bcv-rates.sh
+          ./scripts/update-bcv-rates.sh
+          
+      - name: Commit and push changes
+        run: |
+          git config --local user.name "GitHub Actions Bot"
+          git config --local user.email "github-actions@users.noreply.github.com"
+          git add data.json
+          git diff --staged --quiet || git commit -m "Actualizar tasas BCV - $(date +'%d/%m %H:%M')"
+          git push
