@@ -1,7 +1,7 @@
 #!/bin/bash
 URL="https://bcv.org.ve" 
 
-ARCHIVO_SALIDA="/rates.json"
+ARCHIVO_SALIDA="/data.json"
 
 LINEA_DOLAR=7 
 LINEA_EURO=3  
