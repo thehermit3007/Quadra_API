@@ -2,17 +2,19 @@ name: Update Dolar Rates
 
 on:
   schedule:
-    - cron: '0 8,12,16 * * *'  # 8am, 12pm, 4pm UTC
+    - cron: '0 8,12,16 * * *'
   workflow_dispatch:
 
 jobs:
   update-rates:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT }}   Usar el PAT aquí
+          token: ${{ secrets.PAT }}
+          fetch-depth: 0  # 
           
       - name: Run BCV scraper
         run: |
@@ -20,9 +22,11 @@ jobs:
           ./scripts/update-bcv-rates.sh
           
       - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}  
         run: |
-          git config --local user.name "GitHub Actions Bot"
-          git config --local user.email "github-actions@users.noreply.github.com"
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "github-actions@users.noreply.github.com"
           git add data.json
-          git diff --staged --quiet || git commit -m "Actualizar tasas BCV - $(date +'%d/%m %H:%M')"
+          git commit -m "📈 Actualizar tasas BCV - $(date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
           git push
