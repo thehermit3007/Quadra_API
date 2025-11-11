@@ -19,7 +19,7 @@ jobs:
           
       - name: Run BCV scraper
         run: |
-          chmod +x ./Quadra_API.sh
+          chmod +x ./QuadraAPI.sh
           ./QuadraAPI.sh
           
       - name: Commit and push changes
