@@ -3,7 +3,7 @@ name: Update Dolar Rates
 on:
   schedule:
     - cron: '0 4 * * *'   # 4:00 AM UTC
-    - cron: '0 12 * * *'  # 12:00 PM (mediodía) UTC
+    - cron: '0 16 * * *'  # 12:00 PM (mediodía) UTC
   workflow_dispatch:       # Ejecución manual opcional
 
 jobs:
