@@ -1,10 +1,10 @@
 {
   "status": "success",
-  "timestamp": "2025-11-11T16:34:20Z",
+  "timestamp": "2025-11-12T04:12:57Z",
   "base_currency": "USD/EUR",
   "target_currency": "BS / VES",
   "rates": {
-    "USD": "231.09380000",
-    "EUR": "267.27615626"
+    "USD": "233.04580000",
+    "EUR": "270.25622288"
   }
 }
