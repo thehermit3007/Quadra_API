@@ -3,7 +3,7 @@
 
 Los venezolanos enfrentan diariamente la dificultad de conocer el precio actualizado del dólar para calcular precios de productos y servicios. Las fuentes oficiales no siempre están accesibles o actualizadas, generando frustración en las transacciones cotidianas.
 
-Este proyeco se implementó como un scrapper automático que provee el valor del dólar actualizado tres veces al día (8:00 AM, 12:00 PM y 4:00 PM, hora Venezuela) mediante un archivo JSON público y accesible.
+Este proyeco se implementó como un scrapper automático que provee el valor del dólar actualizado tres veces al día (4:00 AM y 12:00 PM, hora Venezuela) mediante un archivo JSON público y accesible.
 
 ## Cómo Funciona
 
