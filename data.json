@@ -1,14 +1,17 @@
 {
   "status": "success",
-  "timestamp": "2025-11-15T04:19:32Z",
+  "timestamp": "2025-11-15T04:25:19Z",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
-    "USD": "",
-    "EUR": "",
-    "USDT": ""
+    "USD": "0",
+    "EUR": "0",
+    "USDT": "Consultando API de Binance...
+Error: Respuesta invÃ¡lida de Binance
+Respuesta recibida:
+‹ÿìYKsÛ6ş+öšjR|ù&9VÆ¦–ìK§eŒABHÅœŒÿ{$EzU}hé`ûÂ.°ØıvôÕ""¡Ö¹e×ë•Q¥ğHyÉy·|OÌøŠ˜à[çµp²´ÎëŸANˆ¢>ápè"ÏñÂ0“„c¥XZDß€RHœĞYµĞ;O/¯¯ZÀònú~Ë”áâ.gšr9Õüd9-pQª•ÉHkÃ L¸ÀËç·ğW¬8»¤0"
   },
   "cache_info": {
-    "bcv_source": "live"
+    "bcv_source": "cache_fallback"
   }
 }
