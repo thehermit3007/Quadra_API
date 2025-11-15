@@ -1,36 +1,40 @@
-name: Debug QuadraAPI
+name: Update Dolar Rates
 
 on:
-  workflow_dispatch:  # Permite ejecución manual desde la UI
+  schedule:
+    # Binance cada 4 horas
+    - cron: '0 4,8,12,16,20,0 * * *'
+    # BCV solo 4am y 12pm
+    - cron: '0 4,12 * * *'
+  workflow_dispatch:
 
 jobs:
-  debug:
+  update-rates:
     runs-on: ubuntu-latest
+    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y jq bc curl
-
-    - name: Debug - List files
-      run: |
-        echo "=== Current directory ==="
-        pwd
-        echo "=== Files in repository ==="
-        ls -la
-        echo "=== Script content ==="
-        cat QuadraAPI.sh || echo "Script not found"
-        echo "=== Script permissions ==="
-        ls -la QuadraAPI.sh || echo "No script file"
-
-    - name: Test script step by step
-      run: |
-        echo "=== Making script executable ==="
-        chmod +x ./QuadraAPI.sh
-        echo "=== Checking script syntax ==="
-        bash -n ./QuadraAPI.sh || echo "Syntax check failed"
-        echo "=== Running script with trace ==="
-        bash -x ./QuadraAPI.sh
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+          fetch-depth: 0
+          
+      - name: Setup environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          
+      - name: Run BCV and Binance scraper
+        run: |
+          chmod +x ./QuadraAPI.sh
+          ./QuadraAPI.sh
+          
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "github-actions@users.noreply.github.com"
+          git add data.json bcv_cache.json
+          git commit -m "Actualizar tasas BCV y Binance - $(date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
+          git push
