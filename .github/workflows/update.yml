@@ -1,7 +1,7 @@
 name: Debug QuadraAPI
 
 on:
-  workflow_dispatch:  # Permite ejecución manual
+  workflow_dispatch:  # Permite ejecución manual desde la UI
 
 jobs:
   debug:
@@ -10,20 +10,27 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup environment
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y jq bc curl
 
-    - name: Debug info
+    - name: Debug - List files
       run: |
-        echo "Current directory:"
+        echo "=== Current directory ==="
         pwd
+        echo "=== Files in repository ==="
         ls -la
-        echo "Script content:"
+        echo "=== Script content ==="
         cat QuadraAPI.sh || echo "Script not found"
+        echo "=== Script permissions ==="
+        ls -la QuadraAPI.sh || echo "No script file"
 
-    - name: Make executable and run
+    - name: Test script step by step
       run: |
+        echo "=== Making script executable ==="
         chmod +x ./QuadraAPI.sh
-        ./QuadraAPI.sh
+        echo "=== Checking script syntax ==="
+        bash -n ./QuadraAPI.sh || echo "Syntax check failed"
+        echo "=== Running script with trace ==="
+        bash -x ./QuadraAPI.sh
