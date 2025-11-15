@@ -2,9 +2,7 @@ name: Update Dolar Rates
 
 on:
   schedule:
-    # Binance cada 4 horas
     - cron: '0 4,8,12,16,20,0 * * *'
-    # BCV solo 4am y 12pm
     - cron: '0 4,12 * * *'
   workflow_dispatch:
 
@@ -22,19 +20,27 @@ jobs:
       - name: Setup environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq bc curl
           
-      - name: Run BCV and Binance scraper
+      - name: Debug script execution
         run: |
-          chmod +x ./QuadraAPI.sh
-          ./QuadraAPI.sh
+          echo "=== Verificando script ==="
+          ls -la QuadraAPI.sh
+          echo "=== Ejecutando con trace ==="
+          bash -x ./QuadraAPI.sh || echo "SCRIPT FAILED - Mostrando archivos generados:"
+          echo "=== Archivos después de ejecución ==="
+          ls -la *.json || echo "No hay archivos JSON"
           
       - name: Commit and push changes
+        if: always()  # ¡IMPORTANTE! Ejecutar siempre para ver qué pasó
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
         run: |
+          echo "=== Estado de archivos antes de commit ==="
+          ls -la *.json || echo "No hay archivos JSON"
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "github-actions@users.noreply.github.com"
           git add data.json bcv_cache.json
-          git commit -m "Actualizar tasas BCV y Binance - $(date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
+          git status
+          git commit -m "Debug: Verificar estado - $(date +'%d/%m %H:%M')" || echo "No hay cambios"
           git push
