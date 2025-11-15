@@ -74,17 +74,23 @@ EOF
 
 main() {
     local rates_bcv euro dolar usdt timestamp bcv_source
+    local hora_actual=$(date -u +%H)
+    
+    echo "Hora actual UTC: $hora_actual"
+    echo "Debe actualizar BCV: $(debe_actualizar_bcv && echo 'SÍ' || echo 'NO')"
     
     # Inicializar arrays
     rates_bcv=()
     
     # Obtener tasas BCV (desde cache o live)
     if debe_actualizar_bcv; then
+        echo "Actualizando BCV desde live..."
         obtener_tasas_bcv rates_bcv
         bcv_source="live"
     else
+        echo "Cargando BCV desde cache..."
         if ! cargar_tasas_bcv_cache rates_bcv; then
-            # Si no hay cache, usar valores por defecto
+            echo "No hay cache disponible, usando valores por defecto"
             rates_bcv=("0" "0")
             bcv_source="default"
         else
@@ -92,8 +98,13 @@ main() {
         fi
     fi
     
+    echo "Dólar: ${rates_bcv[0]}"
+    echo "Euro: ${rates_bcv[1]}"
+    
     # Obtener tasa Binance
+    echo "Obteniendo tasa Binance..."
     usdt=$(obtener_tasa_binance)
+    echo "USDT: $usdt"
     
     # Asignar valores
     dolar="${rates_bcv[0]}"
@@ -102,6 +113,8 @@ main() {
     
     # Crear JSON de salida
     crear_json_salida "$dolar" "$euro" "$usdt" "$timestamp" "$bcv_source"
+    
+    echo "Archivo generado: $ARCHIVO_SALIDA"
 }
 
 main "$@"
