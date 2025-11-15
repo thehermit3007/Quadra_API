@@ -60,110 +60,13 @@ cargar_tasas_bcv_cache() {
 obtener_tasa_binance() {
     echo "Consultando API de Binance..."
     
-    # Crear archivo temporal para el request
-    local request_file=$(mktemp)
-    cat > "$request_file" << EOF
-{
-    "page": 1,
-    "rows": 3,
-    "payTypes": [],
-    "asset": "USDT",
-    "tradeType": "BUY",
-    "fiat": "VES",
-    "publisherType": null
-}
-EOF
-
-    # Crear archivo temporal para la respuesta
-    local response_file=$(mktemp)
-    
-    # Hacer la petición
-    local http_code=$(curl -s -X POST "$BINANCE_API_URL" \
+    local promedio=$(curl -s -X POST "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search" \
         -H "Content-Type: application/json" \
-        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-        -d @"$request_file" \
-        --connect-timeout 15 \
-        --max-time 20 \
-        -w "%{http_code}" \
-        -o "$response_file")
+        -H "Accept-Encoding: gzip" \
+        -d '{"page":1,"rows":3,"asset":"USDT","tradeType":"SELL","fiat":"VES"}' | \
+        gunzip | jq '.' | grep price | \
+        awk 'NR==3 || NR==7 || NR==11 {split($0, a, "\""); sum += a[4]; count++} END {if(count>0) print sum/count; else print "0"}')
     
-    # Limpiar archivos temporales
-    rm -f "$request_file"
-    
-    # Leer respuesta
-    local response=$(cat "$response_file")
-    rm -f "$response_file"
-    
-    # Verificar código HTTP
-    if [ "$http_code" != "200" ]; then
-        echo "Error: HTTP $http_code de Binance - $response"
-        echo "0"
-        return 1
-    fi
-    
-    if [ -z "$response" ]; then
-        echo "Error: Respuesta vacía de Binance"
-        echo "0"
-        return 1
-    fi
-    
-    # Verificar si la respuesta es JSON válido
-    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-        echo "Error: Respuesta no es JSON válido de Binance"
-        echo "0"
-        return 1
-    fi
-    
-    # Verificar si la API devolvié error
-    if echo "$response" | jq -e '.code != null' >/dev/null 2>&1; then
-        local error_code=$(echo "$response" | jq -r '.code')
-        local error_msg=$(echo "$response" | jq -r '.message')
-        echo "Error de API Binance: $error_code - $error_msg"
-        echo "0"
-        return 1
-    fi
-    
-    # Verificar estructura esperada
-    if ! echo "$response" | jq -e '.data' >/dev/null 2>&1; then
-        echo "Error: Estructura de respuesta Binance inesperada"
-        echo "0"
-        return 1
-    fi
-    
-    # Verificar que hay datos
-    local data_count=$(echo "$response" | jq '.data | length')
-    if [ "$data_count" -eq 0 ]; then
-        echo "Error: No hay datos disponibles en Binance P2P"
-        echo "0"
-        return 1
-    fi
-    
-    # Obtener precios con valores por defecto
-    local precio1=0
-    local precio2=0
-    local precio3=0
-    
-    if [ "$data_count" -ge 1 ]; then
-        precio1=$(echo "$response" | jq -r '.data[0].adv.price // "0"' 2>/dev/null)
-    fi
-    if [ "$data_count" -ge 2 ]; then
-        precio2=$(echo "$response" | jq -r '.data[1].adv.price // "0"' 2>/dev/null)
-    fi
-    if [ "$data_count" -ge 3 ]; then
-        precio3=$(echo "$response" | jq -r '.data[2].adv.price // "0"' 2>/dev/null)
-    fi
-    
-    echo "Precios obtenidos: $precio1, $precio2, $precio3"
-    
-    # Validar que los precios sean números
-    if ! [[ "$precio1" =~ ^[0-9.]+$ ]] || ! [[ "$precio2" =~ ^[0-9.]+$ ]] || ! [[ "$precio3" =~ ^[0-9.]+$ ]]; then
-        echo "Error: Precios inválidos de Binance"
-        echo "0"
-        return 1
-    fi
-    
-    # Calcular promedio
-    local promedio=$(echo "scale=4; ($precio1 + $precio2 + $precio3) / 3" | bc 2>/dev/null || echo "0")
     echo "Promedio calculado: $promedio"
     echo "$promedio"
 }
