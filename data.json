@@ -1,14 +1,14 @@
 {
   "status": "success",
-  "timestamp": "2025-11-15T04:37:19Z",
+  "timestamp": "2025-11-15T04:43:21Z",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
     "USD": "0",
     "EUR": "0",
     "USDT": "Consultando API de Binance...
-Error: Respuesta no es JSON válido de Binance
-0"
+Promedio calculado: 327.967
+327.967"
   },
   "cache_info": {
     "bcv_source": "cache_fallback"
