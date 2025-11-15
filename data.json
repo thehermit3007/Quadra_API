@@ -1,13 +1,13 @@
 {
   "status": "success",
-  "timestamp": "2025-11-15T04:30:36Z",
+  "timestamp": "2025-11-15T04:37:19Z",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
     "USD": "0",
     "EUR": "0",
     "USDT": "Consultando API de Binance...
-Error: HTTP {"code":"000002","message":"illegal parameter","messageDetail":null,"data":null,"success":false} de Binance
+Error: Respuesta no es JSON válido de Binance
 0"
   },
   "cache_info": {
