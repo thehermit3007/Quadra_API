@@ -5,7 +5,7 @@ API gratuita que proporciona tasas de cambio actualizadas del BCV (Bolívar Vene
 ## Características
 
 - **Tasas del BCV**: USD y EUR oficiales del Banco Central de Venezuela
-- **Tasa Binance P2P**: Promedio de las 3 mejores tasas de venta de USDT
+- **Tasa Binance P2P**: Promedio de las 3 mejores tasas de compra de USDT
 - **Actualización automática**: Datos frescos cada 4 horas
 - **Formato JSON**: Fácil de consumir desde cualquier aplicación
 - **Totalmente gratuito**: Sin límites de uso para proyectos personales
@@ -13,7 +13,7 @@ API gratuita que proporciona tasas de cambio actualizadas del BCV (Bolívar Vene
 ## Endpoint
 
 ```
-GET https://[tu-usuario].github.io/[tu-repositorio]/data.json
+GET https://thehermit007.github.io/Quadra_API/data.json
 ```
 
 ## Estructura de la Respuesta
@@ -41,13 +41,13 @@ GET https://[tu-usuario].github.io/[tu-repositorio]/data.json
 |--------|--------|-------------|-------------|
 | USD | BCV | 2 veces/día | Tasa oficial del Banco Central de Venezuela |
 | EUR | BCV | 2 veces/día | Tasa oficial del Euro del BCV |
-| USDT | Binance P2P | 6 veces/día | Promedio de las 3 mejores tasas de venta |
+| USDT | Binance P2P | 6 veces/día | Promedio de las 3 mejores tasas de compra |
 
 ## Frecuencia de Actualización
 
 ### Binance P2P (USDT)
 - **Horarios**: 04:00, 08:00, 12:00, 16:00, 20:00, 00:00 UTC
-- **Método**: Promedio de las 3 mejores ofertas de venta (BUY)
+- **Método**: Promedio de las 3 mejores ofertas de compra (BUY)
 - **Actualización**: Cada 4 horas
 
 ### BCV (USD/EUR)
@@ -61,7 +61,7 @@ GET https://[tu-usuario].github.io/[tu-repositorio]/data.json
 ```javascript
 async function getExchangeRates() {
   try {
-    const response = await fetch('https://[usuario].github.io/[repositorio]/data.json');
+    const response = await fetch('https://thehermit007.github.io/Quadra_API/data.json');
     const data = await response.json();
     
     if (data.status === 'success') {
@@ -81,7 +81,7 @@ async function getExchangeRates() {
 import requests
 
 def get_rates():
-    url = "https://[usuario].github.io/[repositorio]/data.json"
+    url = "https://thehermit007.github.io/Quadra_API/data.json"
     response = requests.get(url)
     data = response.json()
     
@@ -96,7 +96,7 @@ def get_rates():
 
 ### cURL
 ```bash
-curl -s "https://[usuario].github.io/[repositorio]/data.json" | jq .
+curl -s "https://thehermit007.github.io/Quadra_API/data.json" | jq .
 ```
 
 ## Instalación y Desarrollo
@@ -110,8 +110,8 @@ curl -s "https://[usuario].github.io/[repositorio]/data.json" | jq .
 ### Ejecución Local
 ```bash
 # Clonar repositorio
-git clone https://github.com/[usuario]/[repositorio].git
-cd [repositorio]
+git clone https://github.com/thehermit007/Quadra_API.git
+cd Quadra_API
 
 # Ejecutar script manualmente
 chmod +x QuadraAPI.sh
@@ -138,7 +138,7 @@ USDT = (precio1 + precio2 + precio3) / 3
 ```
 
 Donde:
-- `precio1`, `precio2`, `precio3` = Las 3 mejores ofertas de venta de USDT/VES
+- `precio1`, `precio2`, `precio3` = Las 3 mejores ofertas de **compra** de USDT/VES
 - Fuente: API oficial de Binance P2P
 - Parámetros: `asset=USDT`, `tradeType=BUY`, `fiat=VES`
 
