@@ -2,9 +2,11 @@ name: Update Dolar Rates
 
 on:
   schedule:
-    - cron: '0 4 * * *'   # 4:00 AM UTC
-    - cron: '0 16 * * *'  # 12:00 PM (mediodía) UTC
-  workflow_dispatch:       # Ejecución manual opcional
+    # Binance cada 4 horas
+    - cron: '0 4,8,12,16,20,0 * * *'
+    # BCV solo 4am y 12pm
+    - cron: '0 4,12 * * *'
+  workflow_dispatch:
 
 jobs:
   update-rates:
@@ -17,7 +19,12 @@ jobs:
           token: ${{ secrets.PAT }}
           fetch-depth: 0
           
-      - name: Run BCV scraper
+      - name: Setup environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          
+      - name: Run BCV and Binance scraper
         run: |
           chmod +x ./QuadraAPI.sh
           ./QuadraAPI.sh
@@ -28,6 +35,6 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "github-actions@users.noreply.github.com"
-          git add data.json
-          git commit -m "Actualizar tasas BCV - $(date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
+          git add data.json bcv_cache.json
+          git commit -m "Actualizar tasas BCV y Binance - $(date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
           git push
