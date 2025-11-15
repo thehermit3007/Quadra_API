@@ -16,21 +16,44 @@ debe_actualizar_bcv() {
 
 obtener_tasas_bcv() {
     local -n rates_ref=$1
-    local contenido=$(curl -s --retry 3 "$BCV_URL")
+    echo "Conectando a BCV..."
+    local contenido=$(curl -s --retry 3 --connect-timeout 10 "$BCV_URL")
+    
+    if [ -z "$contenido" ]; then
+        echo "Error: No se pudo obtener contenido del BCV"
+        rates_ref=("0" "0")
+        return 1
+    fi
+    
+    # Extraer tasa del dólar
     local tasa_dolar=$(echo "$contenido" | grep -A $LINEA_DOLAR_BCV 'Dólar' | tail -1 | sed -n 's/.*<strong>\([0-9,]\+\)<\/strong>.*/\1/p' | tr ',' '.')
+    # Extraer tasa del euro
     local tasa_euro=$(echo "$contenido" | grep -A $LINEA_EURO_BCV 'Euro' | tail -1 | sed -n 's/.*<strong>\([0-9,]\+\)<\/strong>.*/\1/p' | tr ',' '.')
+    
+    # Validar que se obtuvieron tasas
+    if [ -z "$tasa_dolar" ] || [ -z "$tasa_euro" ]; then
+        echo "Error: No se pudieron extraer las tasas del BCV"
+        echo "Contenido obtenido (primeras 500 chars):"
+        echo "$contenido" | head -c 500
+        rates_ref=("0" "0")
+        return 1
+    fi
+    
+    echo "Tasa dólar extraída: $tasa_dolar"
+    echo "Tasa euro extraída: $tasa_euro"
     
     rates_ref=("$tasa_dolar" "$tasa_euro")
     
     # Guardar en cache
     echo "{\"dolar\":\"$tasa_dolar\",\"euro\":\"$tasa_euro\",\"timestamp\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" > $CACHE_BCV
+    return 0
 }
 
 cargar_tasas_bcv_cache() {
     local -n rates_ref=$1
     if [[ -f $CACHE_BCV ]]; then
-        local dolar=$(jq -r '.dolar' $CACHE_BCV)
-        local euro=$(jq -r '.euro' $CACHE_BCV)
+        local dolar=$(jq -r '.dolar' $CACHE_BCV 2>/dev/null || echo "0")
+        local euro=$(jq -r '.euro' $CACHE_BCV 2>/dev/null || echo "0")
         rates_ref=("$dolar" "$euro")
         return 0
     fi
@@ -38,21 +61,57 @@ cargar_tasas_bcv_cache() {
 }
 
 obtener_tasa_binance() {
+    echo "Consultando API de Binance..."
     local response=$(curl -s -X POST $BINANCE_API_URL \
         -H "Content-Type: application/json" \
-        -d "$BINANCE_REQUEST_DATA")
+        -H "User-Agent: Mozilla/5.0" \
+        -d "$BINANCE_REQUEST_DATA" \
+        --connect-timeout 10)
     
-    local precio1=$(echo "$response" | jq -r '.data[0].adv.price')
-    local precio2=$(echo "$response" | jq -r '.data[1].adv.price')
-    local precio3=$(echo "$response" | jq -r '.data[2].adv.price')
+    # Limpiar bytes nulos
+    response=$(echo "$response" | tr -d '\000')
+    
+    if [ -z "$response" ]; then
+        echo "Error: Respuesta vacía de Binance"
+        echo "0"
+        return 1
+    fi
+    
+    # Verificar si la respuesta es JSON válido
+    if ! echo "$response" | jq empty 2>/dev/null; then
+        echo "Error: Respuesta inválida de Binance"
+        echo "Respuesta recibida:"
+        echo "$response" | head -c 200
+        echo "0"
+        return 1
+    fi
+    
+    local precio1=$(echo "$response" | jq -r '.data[0].adv.price // "0"' 2>/dev/null)
+    local precio2=$(echo "$response" | jq -r '.data[1].adv.price // "0"' 2>/dev/null)
+    local precio3=$(echo "$response" | jq -r '.data[2].adv.price // "0"' 2>/dev/null)
+    
+    echo "Precios obtenidos: $precio1, $precio2, $precio3"
+    
+    # Validar que los precios sean números
+    if ! [[ "$precio1" =~ ^[0-9.]+$ ]] || ! [[ "$precio2" =~ ^[0-9.]+$ ]] || ! [[ "$precio3" =~ ^[0-9.]+$ ]]; then
+        echo "Error: Precios inválidos de Binance"
+        echo "0"
+        return 1
+    fi
     
     # Calcular promedio
-    local promedio=$(echo "scale=4; ($precio1 + $precio2 + $precio3) / 3" | bc)
+    local promedio=$(echo "scale=4; ($precio1 + $precio2 + $precio3) / 3" | bc 2>/dev/null || echo "0")
+    echo "Promedio calculado: $promedio"
     echo "$promedio"
 }
 
 crear_json_salida() {
     local dolar=$1 euro=$2 usdt=$3 timestamp=$4 bcv_source=$5
+    
+    # Usar valores por defecto si están vacíos
+    dolar=${dolar:-"0"}
+    euro=${euro:-"0"} 
+    usdt=${usdt:-"0"}
     
     cat > $ARCHIVO_SALIDA << EOF
 {
@@ -76,6 +135,7 @@ main() {
     local rates_bcv euro dolar usdt timestamp bcv_source
     local hora_actual=$(date -u +%H)
     
+    echo "=== INICIANDO ACTUALIZACIÓN ==="
     echo "Hora actual UTC: $hora_actual"
     echo "Debe actualizar BCV: $(debe_actualizar_bcv && echo 'SÍ' || echo 'NO')"
     
@@ -85,8 +145,18 @@ main() {
     # Obtener tasas BCV (desde cache o live)
     if debe_actualizar_bcv; then
         echo "Actualizando BCV desde live..."
-        obtener_tasas_bcv rates_bcv
-        bcv_source="live"
+        if ! obtener_tasas_bcv rates_bcv; then
+            echo "Falló actualización BCV, intentando cargar cache..."
+            if ! cargar_tasas_bcv_cache rates_bcv; then
+                echo "No hay cache disponible, usando valores por defecto"
+                rates_bcv=("0" "0")
+                bcv_source="error"
+            else
+                bcv_source="cache_fallback"
+            fi
+        else
+            bcv_source="live"
+        fi
     else
         echo "Cargando BCV desde cache..."
         if ! cargar_tasas_bcv_cache rates_bcv; then
@@ -98,22 +168,24 @@ main() {
         fi
     fi
     
-    echo "Dólar: ${rates_bcv[0]}"
-    echo "Euro: ${rates_bcv[1]}"
+    echo "Dólar final: ${rates_bcv[0]}"
+    echo "Euro final: ${rates_bcv[1]}"
     
     # Obtener tasa Binance
     echo "Obteniendo tasa Binance..."
     usdt=$(obtener_tasa_binance)
-    echo "USDT: $usdt"
+    echo "USDT final: $usdt"
     
-    # Asignar valores
-    dolar="${rates_bcv[0]}"
-    euro="${rates_bcv[1]}"
+    # Asignar valores (con valores por defecto)
+    dolar="${rates_bcv[0]:-0}"
+    euro="${rates_bcv[1]:-0}"
+    usdt="${usdt:-0}"
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     
     # Crear JSON de salida
     crear_json_salida "$dolar" "$euro" "$usdt" "$timestamp" "$bcv_source"
     
+    echo "=== ACTUALIZACIÓN COMPLETADA ==="
     echo "Archivo generado: $ARCHIVO_SALIDA"
 }
 
