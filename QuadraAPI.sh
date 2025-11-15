@@ -20,15 +20,17 @@ obtener_tasas_bcv() {
     
     rates_ref=("$tasa_dolar" "$tasa_euro")
     
-    # Guardar en cache
-    echo "{\"dolar\":\"$tasa_dolar\",\"euro\":\"$tasa_euro\",\"timestamp\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" > $CACHE_BCV
+    # Guardar en cache SOLO si se obtuvieron tasas válidas
+    if [ -n "$tasa_dolar" ] && [ -n "$tasa_euro" ] && [ "$tasa_dolar" != "0" ] && [ "$tasa_euro" != "0" ]; then
+        echo "{\"dolar\":\"$tasa_dolar\",\"euro\":\"$tasa_euro\",\"timestamp\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" > $CACHE_BCV
+    fi
 }
 
 cargar_tasas_bcv_cache() {
     local -n rates_ref=$1
     if [[ -f $CACHE_BCV ]]; then
-        local dolar=$(jq -r '.dolar' $CACHE_BCV)
-        local euro=$(jq -r '.euro' $CACHE_BCV)
+        local dolar=$(jq -r '.dolar' $CACHE_BCV 2>/dev/null || echo "0")
+        local euro=$(jq -r '.euro' $CACHE_BCV 2>/dev/null || echo "0")
         rates_ref=("$dolar" "$euro")
         return 0
     fi
@@ -73,21 +75,24 @@ main() {
     
     # Obtener tasas BCV (desde cache o live)
     if debe_actualizar_bcv; then
+        # Solo en horarios BCV: intentar actualizar
         obtener_tasas_bcv rates_bcv
         bcv_source="live"
     else
-        if ! cargar_tasas_bcv_cache rates_bcv; then
-            rates_bcv=("0" "0")
-            bcv_source="default"
-        else
+        # Fuera de horarios BCV: solo usar cache, NUNCA sobrescribir
+        if cargar_tasas_bcv_cache rates_bcv; then
             bcv_source="cache"
+        else
+            # Si no hay cache, mantener valores anteriores (no poner "0")
+            bcv_source="no_cache"
+            # No modificar rates_bcv, se mantiene vacío
         fi
     fi
     
     # Obtener tasa Binance
     usdt=$(obtener_tasa_binance)
     
-    # Asignar valores
+    # Asignar valores (usar valores existentes si no hay nuevos)
     dolar="${rates_bcv[0]}"
     euro="${rates_bcv[1]}"
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
