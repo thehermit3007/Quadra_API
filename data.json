@@ -1,16 +1,14 @@
 {
   "status": "success",
-  "timestamp": "2025-11-15T04:43:21Z",
+  "timestamp": "2025-11-15T04:52:51Z",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
-    "USD": "0",
-    "EUR": "0",
-    "USDT": "Consultando API de Binance...
-Promedio calculado: 327.967
-327.967"
+    "USD": "",
+    "EUR": "",
+    "USDT": "328.27"
   },
   "cache_info": {
-    "bcv_source": "cache_fallback"
+    "bcv_source": "live"
   }
 }
