@@ -33,8 +33,6 @@ obtener_tasas_bcv() {
     # Validar que se obtuvieron tasas
     if [ -z "$tasa_dolar" ] || [ -z "$tasa_euro" ]; then
         echo "Error: No se pudieron extraer las tasas del BCV"
-        echo "Contenido obtenido (primeras 500 chars):"
-        echo "$contenido" | head -c 500
         rates_ref=("0" "0")
         return 1
     fi
@@ -62,14 +60,31 @@ cargar_tasas_bcv_cache() {
 
 obtener_tasa_binance() {
     echo "Consultando API de Binance..."
-    local response=$(curl -s -X POST $BINANCE_API_URL \
-        -H "Content-Type: application/json" \
-        -H "User-Agent: Mozilla/5.0" \
-        -d "$BINANCE_REQUEST_DATA" \
-        --connect-timeout 10)
     
-    # Limpiar bytes nulos
-    response=$(echo "$response" | tr -d '\000')
+    # Crear archivo temporal para la respuesta
+    local temp_file=$(mktemp)
+    
+    # Hacer la petición y manejar compresión automáticamente
+    local http_code=$(curl -s -X POST $BINANCE_API_URL \
+        -H "Content-Type: application/json" \
+        -H "Accept: application/json" \
+        -H "Accept-Encoding: identity" \  # Evitar compresión
+        -d "$BINANCE_REQUEST_DATA" \
+        --connect-timeout 10 \
+        --compressed \
+        -w "%{http_code}" \
+        -o "$temp_file")
+    
+    # Leer respuesta
+    local response=$(cat "$temp_file")
+    rm -f "$temp_file"
+    
+    # Verificar código HTTP
+    if [ "$http_code" != "200" ]; then
+        echo "Error: HTTP $http_code de Binance"
+        echo "0"
+        return 1
+    fi
     
     if [ -z "$response" ]; then
         echo "Error: Respuesta vacía de Binance"
@@ -78,10 +93,18 @@ obtener_tasa_binance() {
     fi
     
     # Verificar si la respuesta es JSON válido
-    if ! echo "$response" | jq empty 2>/dev/null; then
-        echo "Error: Respuesta inválida de Binance"
-        echo "Respuesta recibida:"
-        echo "$response" | head -c 200
+    if ! echo "$response" | jq . >/dev/null 2>&1; then
+        echo "Error: Respuesta no es JSON válido de Binance"
+        echo "Primeros 100 caracteres de respuesta:"
+        echo "$response" | head -c 100
+        echo ""
+        echo "0"
+        return 1
+    fi
+    
+    # Verificar estructura esperada
+    if ! echo "$response" | jq -e '.data' >/dev/null 2>&1; then
+        echo "Error: Estructura de respuesta Binance inesperada"
         echo "0"
         return 1
     fi
