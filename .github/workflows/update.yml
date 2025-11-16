@@ -2,17 +2,23 @@ name: Update Dolar Rates
 
 on:
   schedule:
-    # Binance cada 4 horas
+    # Binance cada 4 horas (hora Venezuela)
     - cron: '0 4,8,12,16,20,0 * * *'
-    # BCV solo 4am y 12pm UTC
+    # BCV 4am y 12pm hora Venezuela
     - cron: '0 4,12 * * *'
   workflow_dispatch:
+
+env:
+  TZ: America/Caracas
 
 jobs:
   update-rates:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone America/Caracas
+        
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -40,5 +46,5 @@ jobs:
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "github-actions@users.noreply.github.com"
           git add data.json bcv_cache.json
-          git commit -m "Actualizar tasas BCV y Binance - $(date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
+          git commit -m "Actualizar tasas BCV y Binance - $(TZ='America/Caracas' date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
           git push
