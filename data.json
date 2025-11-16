@@ -1,12 +1,14 @@
 {
   "status": "success",
-  "timestamp": "2025-11-16T16:22:25Z",
+  "timestamp": "2025-11-16T19:24:07Z",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
     "USD": "236.46",
     "EUR": "274.84",
-    "USDT": "328.455"
+    "USDT": "Obteniendo tasa Binance...
+Error: Tasa Binance inválida: 0
+0"
   },
   "cache_info": {
     "bcv_source": "existing_data"
