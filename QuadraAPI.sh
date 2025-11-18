@@ -26,7 +26,6 @@ obtener_tasas_bcv() {
 }
 
 obtener_tasa_binance() {
-    # MANTENIENDO LA LÓGICA ORIGINAL DE BINANCE
     local tasa=$(curl -s -X POST "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search" \
         -H "Content-Type: application/json" \
         -H "Accept-Encoding: gzip" \
@@ -34,93 +33,105 @@ obtener_tasa_binance() {
         gunzip | jq '.' | grep price | \
         awk 'NR==3 || NR==7 || NR==11 {split($0, a, "\""); sum += a[4]; count++} END {if(count>0) print sum/count; else print "0"}')
     
-    # Validar que la tasa no esté vacía
     echo "${tasa:-0}"
 }
 
-actualizar_campo_json() {
-    local campo="$1"
-    local valor="$2"
-    local temp_file=$(mktemp)
+# CARGAR DATOS EXISTENTES PARA PRESERVAR
+cargar_json_existente() {
+    local -n dolar_ref=$1 euro_ref=$2 usdt_ref=$3 timestamp_ref=$4 bcv_source_ref=$5
     
-    jq --arg campo "$campo" --arg valor "$valor" '.rates[$campo] = $valor' $ARCHIVO_SALIDA > "$temp_file" && mv "$temp_file" $ARCHIVO_SALIDA
+    if [[ -f $ARCHIVO_SALIDA ]]; then
+        dolar_ref=$(jq -r '.rates.USD' $ARCHIVO_SALIDA 2>/dev/null || echo "0")
+        euro_ref=$(jq -r '.rates.EUR' $ARCHIVO_SALIDA 2>/dev/null || echo "0")
+        usdt_ref=$(jq -r '.rates.USDT' $ARCHIVO_SALIDA 2>/dev/null || echo "0")
+        timestamp_ref=$(jq -r '.timestamp' $ARCHIVO_SALIDA 2>/dev/null || echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")")
+        bcv_source_ref=$(jq -r '.cache_info.bcv_source' $ARCHIVO_SALIDA 2>/dev/null || echo "unknown")
+        return 0
+    fi
+    return 1
 }
 
-actualizar_timestamp_json() {
-    local temp_file=$(mktemp)
-    jq --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" '.timestamp = $timestamp' $ARCHIVO_SALIDA > "$temp_file" && mv "$temp_file" $ARCHIVO_SALIDA
-}
-
-actualizar_fuente_bcv_json() {
-    local fuente="$1"
-    local temp_file=$(mktemp)
-    jq --arg fuente "$fuente" '.cache_info.bcv_source = $fuente' $ARCHIVO_SALIDA > "$temp_file" && mv "$temp_file" $ARCHIVO_SALIDA
-}
-
-inicializar_json() {
-    if [[ ! -f $ARCHIVO_SALIDA ]]; then
-        cat > $ARCHIVO_SALIDA << EOF
+crear_json_salida() {
+    local dolar=$1 euro=$2 usdt=$3 timestamp=$4 bcv_source=$5
+    
+    cat > $ARCHIVO_SALIDA << EOF
 {
   "status": "success",
-  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "timestamp": "$timestamp",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
-    "USD": "0",
-    "EUR": "0",
-    "USDT": "0"
+    "USD": "$dolar",
+    "EUR": "$euro",
+    "USDT": "$usdt"
   },
   "cache_info": {
-    "bcv_source": "initial"
+    "bcv_source": "$bcv_source"
   }
 }
 EOF
-    fi
 }
 
 main() {
+    local rates_bcv euro dolar usdt timestamp bcv_source
+    
     echo "=== INICIANDO ACTUALIZACIÓN DE TASAS ==="
     echo "Hora actual UTC: $(date -u +"%H:%M")"
     
-    # Inicializar JSON si no existe
-    inicializar_json
+    # Cargar valores existentes del JSON (si existe)
+    if ! cargar_json_existente dolar euro usdt timestamp bcv_source; then
+        echo "No existe archivo JSON previo, inicializando con valores por defecto"
+        dolar="0"
+        euro="0"
+        usdt="0"
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        bcv_source="unknown"
+    else
+        echo "Datos existentes cargados: USD=$dolar, EUR=$euro, USDT=$usdt"
+    fi
     
-    # Actualizar Binance (SIEMPRE)
+    # Obtener tasa Binance (SIEMPRE se actualiza)
     echo "--- ACTUALIZANDO BINANCE ---"
     local nueva_tasa_binance=$(obtener_tasa_binance)
     if [[ "$nueva_tasa_binance" != "0" ]]; then
-        actualizar_campo_json "USDT" "$nueva_tasa_binance"
-        echo "Binance actualizado: $nueva_tasa_binance"
+        usdt="$nueva_tasa_binance"
+        echo "Binance actualizado: $usdt"
     else
-        echo "Manteniendo tasa Binance anterior"
+        echo "Manteniendo tasa Binance anterior: $usdt"
     fi
     
-    # Manejar BCV según horario
+    # Manejar tasas BCV según horario
     echo "--- MANEJANDO TASAS BCV ---"
+    rates_bcv=("" "")
     
     if debe_actualizar_bcv; then
         echo "Horario BCV detectado, intentando actualizar..."
-        local rates_bcv=("" "")
         if obtener_tasas_bcv rates_bcv; then
-            actualizar_campo_json "USD" "${rates_bcv[0]}"
-            actualizar_campo_json "EUR" "${rates_bcv[1]}"
-            actualizar_fuente_bcv_json "live"
+            dolar="${rates_bcv[0]}"
+            euro="${rates_bcv[1]}"
+            bcv_source="live"
             echo "✓ Tasas BCV actualizadas desde fuente en vivo"
         else
-            actualizar_fuente_bcv_json "live_failed"
+            bcv_source="live_failed"
             echo "✗ Falló la obtención en vivo de BCV, manteniendo valores anteriores"
         fi
     else
         echo "Fuera de horario BCV, no se actualizan tasas BCV"
-        actualizar_fuente_bcv_json "no_update"
+        bcv_source="no_update"
     fi
     
-    # Actualizar timestamp siempre
-    actualizar_timestamp_json
+    # Actualizar timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    
+    # Crear JSON de salida
+    crear_json_salida "$dolar" "$euro" "$usdt" "$timestamp" "$bcv_source"
     
     echo "=== ACTUALIZACIÓN COMPLETADA ==="
-    echo "Contenido final:"
-    cat $ARCHIVO_SALIDA
+    echo "USD: $dolar"
+    echo "EUR: $euro" 
+    echo "USDT: $usdt"
+    echo "Fuente BCV: $bcv_source"
+    echo "Timestamp: $timestamp"
 }
 
 main "$@"
