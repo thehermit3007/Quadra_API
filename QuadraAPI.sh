@@ -13,12 +13,41 @@ ACTUALIZAR_BINANCE=false
 
 debe_actualizar_bcv() {
     local hora_actual=$(date -u +%H)
-    [[ $hora_actual == "08" || $hora_actual == "16" ]]  # 4AM y 12PM Venezuela (UTC-4)
+    
+    # Horarios específicos para BCV (4AM y 12PM Venezuela = 8AM y 4PM UTC)
+    if [[ $hora_actual == "08" || $hora_actual == "16" ]]; then
+        echo "✓ Horario BCV detectado (UTC $hora_actual:00)"
+        return 0
+    fi
+    
+    # Verificar si la última consulta BCV es del día actual
+    if [[ -f $CACHE_BCV ]]; then
+        local ultima_actualizacion=$(jq -r '.timestamp' $CACHE_BCV 2>/dev/null)
+        if [[ -n "$ultima_actualizacion" && "$ultima_actualizacion" != "null" ]]; then
+            local fecha_cache=$(echo "$ultima_actualizacion" | cut -d'T' -f1)
+            local fecha_actual=$(date -u +"%Y-%m-%d")
+            
+            if [[ "$fecha_cache" != "$fecha_actual" ]]; then
+                echo "✓ Última consulta BCV es de día diferente ($fecha_cache vs $fecha_actual)"
+                return 0
+            else
+                echo "✗ Última consulta BCV es del día actual ($fecha_actual)"
+            fi
+        else
+            echo "✓ No hay timestamp válido en cache BCV"
+            return 0
+        fi
+    else
+        echo "✓ No existe cache BCV"
+        return 0
+    fi
+    
+    return 1
 }
 
 debe_actualizar_binance() {
     local hora_actual=$(date -u +%H)
-    [[ $hora_actual == "08" || $hora_actual == "12" || $hora_actual == "16" || $hora_actual == "20" || $hora_actual == "00" || $hora_actual == "04" ]]
+    [[ $hora_actual == "04" || $hora_actual == "08" || $hora_actual == "12" || $hora_actual == "16" || $hora_actual == "20" || $hora_actual == "00" ]]
 }
 
 obtener_tasas_bcv() {
@@ -57,23 +86,17 @@ cargar_tasas_bcv_cache() {
     return 1
 }
 
+# FUNCIÓN BINANCE ORIGINAL (SIN MODIFICACIONES)
 obtener_tasa_binance() {
-    echo "Obteniendo tasa Binance..."
     local tasa=$(curl -s -X POST "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search" \
         -H "Content-Type: application/json" \
         -H "Accept-Encoding: gzip" \
         -d '{"page":1,"rows":3,"asset":"USDT","tradeType":"BUY","fiat":"VES"}' | \
-        gunzip 2>/dev/null | jq '.' | grep price | \
+        gunzip | jq '.' | grep price | \
         awk 'NR==3 || NR==7 || NR==11 {split($0, a, "\""); sum += a[4]; count++} END {if(count>0) print sum/count; else print "0"}')
     
     # Validar que la tasa no esté vacía
-    if [[ -n "$tasa" && "$tasa" != "0" ]]; then
-        echo "Tasa Binance obtenida: $tasa"
-        echo "$tasa"
-    else
-        echo "No se pudo obtener tasa Binance"
-        echo "0"
-    fi
+    echo "${tasa:-0}"
 }
 
 cargar_json_existente() {
@@ -81,7 +104,7 @@ cargar_json_existente() {
     
     if [[ -f $ARCHIVO_SALIDA ]]; then
         json_ref=$(cat $ARCHIVO_SALIDA)
-        echo "JSON existente cargado"
+        echo "✓ JSON existente cargado"
         return 0
     else
         # Crear JSON inicial si no existe
@@ -100,7 +123,7 @@ cargar_json_existente() {
   }
 }'
         echo "$json_ref" > $ARCHIVO_SALIDA
-        echo "JSON inicial creado"
+        echo "✓ JSON inicial creado"
         return 1
     fi
 }
@@ -133,15 +156,15 @@ procesar_bcv() {
         actualizar_campo_json "USD" "${rates_bcv[0]}"
         actualizar_campo_json "EUR" "${rates_bcv[1]}"
         fuente_bcv="live"
-        echo "BCV actualizado desde fuente en vivo"
+        echo "✓ BCV actualizado desde fuente en vivo"
     elif cargar_tasas_bcv_cache rates_bcv; then
         actualizar_campo_json "USD" "${rates_bcv[0]}"
         actualizar_campo_json "EUR" "${rates_bcv[1]}"
         fuente_bcv="cache_fallback"
-        echo "BCV actualizado desde cache"
+        echo "✓ BCV actualizado desde cache"
     else
         fuente_bcv="failed"
-        echo "No se pudo actualizar BCV"
+        echo "✗ No se pudo actualizar BCV"
     fi
     
     actualizar_fuente_bcv "$fuente_bcv"
@@ -153,25 +176,35 @@ procesar_binance() {
     
     if [[ "$tasa_binance" != "0" ]]; then
         actualizar_campo_json "USDT" "$tasa_binance"
-        echo "Binance actualizado: $tasa_binance"
+        echo "✓ Binance actualizado: $tasa_binance"
     else
-        echo "No se pudo actualizar Binance, manteniendo valor anterior"
+        echo "✗ No se pudo actualizar Binance, manteniendo valor anterior"
     fi
 }
 
 main() {
     echo "=== INICIANDO ACTUALIZACIÓN DE TASAS ==="
     echo "Hora actual UTC: $(date -u +"%H:%M")"
+    echo "Fecha actual UTC: $(date -u +"%Y-%m-%d")"
+    
+    # Mostrar información del cache BCV si existe
+    if [[ -f $CACHE_BCV ]]; then
+        local cache_timestamp=$(jq -r '.timestamp' $CACHE_BCV 2>/dev/null || echo "N/A")
+        echo "Última actualización BCV cache: $cache_timestamp"
+    fi
     
     # Determinar qué actualizar basado en la hora
     if debe_actualizar_bcv; then
         ACTUALIZAR_BCV=true
-        echo "Horario BCV detectado"
+    else
+        echo "--- BCV: Fuera de horario o ya actualizado hoy ---"
     fi
     
     if debe_actualizar_binance; then
         ACTUALIZAR_BINANCE=true
         echo "✓ Horario Binance detectado"
+    else
+        echo "--- BINANCE: Fuera de horario, no se actualiza ---"
     fi
     
     # Cargar JSON existente o crear uno nuevo
@@ -184,14 +217,10 @@ main() {
     # Procesar actualizaciones según corresponda
     if [ "$ACTUALIZAR_BCV" = true ]; then
         procesar_bcv
-    else
-        echo "--- BCV: Fuera de horario, no se actualiza ---"
     fi
     
     if [ "$ACTUALIZAR_BINANCE" = true ]; then
         procesar_binance
-    else
-        echo "--- BINANCE: Fuera de horario, no se actualiza ---"
     fi
     
     echo "=== ACTUALIZACIÓN COMPLETADA ==="
