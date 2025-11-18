@@ -3,30 +3,39 @@ name: Update Dolar Rates
 on:
   schedule:
     # Binance cada 4 horas (UTC)
-    - cron: '0 4,8,12,16,20,0 * * *'
+    - cron: '0 0,4,8,12,16,20 * * *'
     # BCV 8am y 4pm UTC (equivale a 4am y 12pm Venezuela UTC-4)
     - cron: '0 8,16 * * *'
   workflow_dispatch:
+
+env:
+  TZ: America/Caracas
 
 jobs:
   update-rates:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Setup timezone
+        run: sudo timedatectl set-timezone America/Caracas
+        
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT }}
+          fetch-depth: 0
           
       - name: Setup environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq curl
+          sudo apt-get install -y jq bc curl
           
-      - name: Run update script
+      - name: Run with debug
         run: |
           chmod +x ./QuadraAPI.sh
           ./QuadraAPI.sh
+          echo "=== CONTENIDO GENERADO ==="
+          cat data.json
           
       - name: Commit and push changes
         env:
@@ -34,6 +43,6 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "github-actions@users.noreply.github.com"
-          git add data.json bcv_cache.json
-          git commit -m "Actualizar tasas - $(date -u +'%d/%m %H:%M UTC')" || echo "No hay cambios que commitear"
+          git add data.json
+          git commit -m "Actualizar tasas BCV y Binance - $(TZ='America/Caracas' date +'%d/%m %H:%M')" || echo "No hay cambios que commitear"
           git push
