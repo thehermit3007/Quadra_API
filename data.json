@@ -4,8 +4,8 @@
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
-    "USD": "236,838",
-    "EUR": "274,356",
+    "USD": "237,750",
+    "EUR": "275,814",
     "USDT": "342.6"
   },
   "cache_info": {
