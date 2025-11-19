@@ -7,8 +7,8 @@ readonly LINEA_DOLAR_BCV=7
 readonly LINEA_EURO_BCV=3
 
 debe_actualizar_bcv() {
-    local hora_actual=$(date -u +%H)
-    [[ $hora_actual == "08" || $hora_actual == "16" ]]
+    local hora_actual=$(TZ='America/Caracas' date +%H)
+    [[ $hora_actual == "04" || $hora_actual == "12" ]]
 }
 
 obtener_tasas_bcv() {
