@@ -12,6 +12,12 @@ debe_actualizar_bcv() {
     [[ $hora_actual == "4" || $hora_actual == "9" || $hora_actual == "12" ]]
 }
 
+# Función para normalizar formato numérico (coma a punto)
+normalizar_numero() {
+    local numero="$1"
+    echo "$numero" | tr ',' '.'
+}
+
 # Nueva función: Validar si las tasas BCV están desactualizadas
 validar_tasas_desactualizadas() {
     local tasa_dolar_actual=$1
@@ -19,16 +25,26 @@ validar_tasas_desactualizadas() {
     local tasa_dolar_json=$3
     local tasa_euro_json=$4
     
+    # Normalizar formatos (coma a punto)
+    local dolar_actual_num=$(normalizar_numero "$tasa_dolar_actual")
+    local euro_actual_num=$(normalizar_numero "$tasa_euro_actual")
+    local dolar_json_num=$(normalizar_numero "$tasa_dolar_json")
+    local euro_json_num=$(normalizar_numero "$tasa_euro_json")
+    
+    echo "DEBUG - Tasas normalizadas:"
+    echo "DEBUG - USD Actual: $dolar_actual_num | USD JSON: $dolar_json_num"
+    echo "DEBUG - EUR Actual: $euro_actual_num | EUR JSON: $euro_json_num"
+    
     # Si alguna tasa es 0 o vacía, considerar desactualizado
-    if [[ -z "$tasa_dolar_json" || "$tasa_dolar_json" == "0" || \
-          -z "$tasa_euro_json" || "$tasa_euro_json" == "0" ]]; then
+    if [[ -z "$dolar_json_num" || "$dolar_json_num" == "0" || \
+          -z "$euro_json_num" || "$euro_json_num" == "0" ]]; then
         echo "✓ Tasas BCV en JSON inválidas, se requiere actualización"
         return 0
     fi
     
     # Calcular diferencia porcentual
-    local diff_dolar=$(echo "scale=4; (($tasa_dolar_actual - $tasa_dolar_json) / $tasa_dolar_json) * 100" | bc | sed 's/-//')
-    local diff_euro=$(echo "scale=4; (($tasa_euro_actual - $tasa_euro_json) / $tasa_euro_json) * 100" | bc | sed 's/-//')
+    local diff_dolar=$(echo "scale=4; (($dolar_actual_num - $dolar_json_num) / $dolar_json_num) * 100" | bc | sed 's/-//')
+    local diff_euro=$(echo "scale=4; (($euro_actual_num - $euro_json_num) / $euro_json_num) * 100" | bc | sed 's/-//')
     
     echo "DEBUG - Diferencia USD: ${diff_dolar}% | EUR: ${diff_euro}%"
     
