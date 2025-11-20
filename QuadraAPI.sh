@@ -61,9 +61,13 @@ validar_tasas_desactualizadas() {
 
 obtener_tasas_bcv() {
     local -n rates_ref=$1
-    local contenido=$(curl -s --retry 3 --connect-timeout 10 "$BCV_URL")
-    local tasa_dolar=$(echo "$contenido" | grep -A $LINEA_DOLAR_BCV 'Dólar' | tail -1 | sed -n 's/.*<strong>\([0-9,]\+\)<\/strong>.*/\1/p' | tr ',' '.')
-    local tasa_euro=$(echo "$contenido" | grep -A $LINEA_EURO_BCV 'Euro' | tail -1 | sed -n 's/.*<strong>\([0-9,]\+\)<\/strong>.*/\1/p' | tr ',' '.')
+    local contenido=$(curl -ksl --retry 3 --connect-timeout 10 "$BCV_URL")
+    
+    # Extraer solo el contenido entre <strong> y </strong>
+    local tasas=$(echo "$contenido" | sed -n 's/.*<strong>\([^<]*\)<\/strong>.*/\1/p')
+    
+    local tasa_dolar=$(echo "$tasas" | awk 'NR==7')
+    local tasa_euro=$(echo "$tasas" | awk 'NR==3')
     
     rates_ref=("$tasa_dolar" "$tasa_euro")
     
