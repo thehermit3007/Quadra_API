@@ -5,10 +5,42 @@ readonly BCV_URL="https://bcv.org.ve"
 readonly ARCHIVO_SALIDA="data.json"
 readonly LINEA_DOLAR_BCV=7
 readonly LINEA_EURO_BCV=3
+readonly UMBRAL_CAMBIO=0.1  # 10% de cambio mínimo para considerar desactualizado
 
 debe_actualizar_bcv() {
-    local hora_actual=$(TZ='America/Caracas' date +%H)
-    [[ $hora_actual == "04" || $hora_actual == "12" ]]
+    local hora_actual=$(TZ='America/Caracas' date +%-H)
+    [[ $hora_actual == "4" || $hora_actual == "9" || $hora_actual == "12" ]]
+}
+
+# Nueva función: Validar si las tasas BCV están desactualizadas
+validar_tasas_desactualizadas() {
+    local tasa_dolar_actual=$1
+    local tasa_euro_actual=$2
+    local tasa_dolar_json=$3
+    local tasa_euro_json=$4
+    
+    # Si alguna tasa es 0 o vacía, considerar desactualizado
+    if [[ -z "$tasa_dolar_json" || "$tasa_dolar_json" == "0" || \
+          -z "$tasa_euro_json" || "$tasa_euro_json" == "0" ]]; then
+        echo "✓ Tasas BCV en JSON inválidas, se requiere actualización"
+        return 0
+    fi
+    
+    # Calcular diferencia porcentual
+    local diff_dolar=$(echo "scale=4; (($tasa_dolar_actual - $tasa_dolar_json) / $tasa_dolar_json) * 100" | bc | sed 's/-//')
+    local diff_euro=$(echo "scale=4; (($tasa_euro_actual - $tasa_euro_json) / $tasa_euro_json) * 100" | bc | sed 's/-//')
+    
+    echo "DEBUG - Diferencia USD: ${diff_dolar}% | EUR: ${diff_euro}%"
+    
+    # Si el cambio es mayor al umbral, considerar desactualizado
+    if (( $(echo "$diff_dolar > $UMBRAL_CAMBIO" | bc -l) )) || \
+       (( $(echo "$diff_euro > $UMBRAL_CAMBIO" | bc -l) )); then
+        echo "✓ Tasas BCV desactualizadas (cambio > ${UMBRAL_CAMBIO}%), se requiere actualización"
+        return 0
+    else
+        echo "✓ Tasas BCV actualizadas (cambio ≤ ${UMBRAL_CAMBIO}%), no se requiere actualización"
+        return 1
+    fi
 }
 
 obtener_tasas_bcv() {
@@ -76,7 +108,7 @@ main() {
     local rates_bcv euro dolar usdt timestamp bcv_source
     
     echo "=== INICIANDO ACTUALIZACIÓN DE TASAS ==="
-    echo "Hora actual UTC: $(date -u +"%H:%M")"
+    echo "Hora actual Venezuela: $(TZ='America/Caracas' date)"
     
     # Cargar valores existentes del JSON (si existe)
     if ! cargar_json_existente dolar euro usdt timestamp bcv_source; then
@@ -100,17 +132,30 @@ main() {
         echo "Manteniendo tasa Binance anterior: $usdt"
     fi
     
-    # Manejar tasas BCV según horario
+    # Manejar tasas BCV según horario y validación
     echo "--- MANEJANDO TASAS BCV ---"
     rates_bcv=("" "")
+    local actualizar_bcv_horario=$(debe_actualizar_bcv)
     
-    if debe_actualizar_bcv; then
-        echo "Horario BCV detectado, intentando actualizar..."
+    if $actualizar_bcv_horario; then
+        echo "Horario BCV detectado (4:00 AM, 9:00 AM o 12:00 PM), obteniendo tasas actuales..."
         if obtener_tasas_bcv rates_bcv; then
-            dolar="${rates_bcv[0]}"
-            euro="${rates_bcv[1]}"
-            bcv_source="live"
-            echo "✓ Tasas BCV actualizadas desde fuente en vivo"
+            local tasa_dolar_actual="${rates_bcv[0]}"
+            local tasa_euro_actual="${rates_bcv[1]}"
+            
+            echo "Tasas BCV obtenidas - USD: $tasa_dolar_actual, EUR: $tasa_euro_actual"
+            echo "Tasas JSON actuales - USD: $dolar, EUR: $euro"
+            
+            # Validar si las tasas están desactualizadas
+            if validar_tasas_desactualizadas "$tasa_dolar_actual" "$tasa_euro_actual" "$dolar" "$euro"; then
+                dolar="$tasa_dolar_actual"
+                euro="$tasa_euro_actual"
+                bcv_source="live_updated"
+                echo "✓ Tasas BCV actualizadas por cambio significativo"
+            else
+                bcv_source="live_no_change"
+                echo "✓ Tasas BCV mantienen valores anteriores (sin cambio significativo)"
+            fi
         else
             bcv_source="live_failed"
             echo "✗ Falló la obtención en vivo de BCV, manteniendo valores anteriores"
