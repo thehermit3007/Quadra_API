@@ -3,8 +3,6 @@
 # Configuración
 readonly BCV_URL="https://www.bcv.org.ve"
 readonly ARCHIVO_SALIDA="data.json"
-readonly LINEA_DOLAR_BCV=7
-readonly LINEA_EURO_BCV=3
 readonly UMBRAL_CAMBIO=0.1  # 10% de cambio mínimo para considerar desactualizado
 
 debe_actualizar_bcv() {
@@ -63,8 +61,8 @@ obtener_tasas_bcv() {
     local -n rates_ref=$1
     local contenido=$(curl -ksl --retry 3 --connect-timeout 10 "$BCV_URL")
     
-    # Extraer solo el contenido entre <strong> y </strong>
-    local tasas=$(echo "$contenido" | sed -n 's/.*<strong>\([^<]*\)<\/strong>.*/\1/p')
+    # Extraer TODOS los contenidos de strong tags de forma robusta
+    local tasas=$(echo "$contenido" | grep -o '<strong>[^<]*</strong>' | sed 's/<[^>]*>//g')
     
     local tasa_dolar=$(echo "$tasas" | awk 'NR==7')
     local tasa_euro=$(echo "$tasas" | awk 'NR==3')
