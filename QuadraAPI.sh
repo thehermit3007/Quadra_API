@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuración
-readonly BCV_URL="https://bcv.org.ve"
+readonly BCV_URL="https://www.bcv.org.ve"
 readonly ARCHIVO_SALIDA="data.json"
 readonly LINEA_DOLAR_BCV=7
 readonly LINEA_EURO_BCV=3
