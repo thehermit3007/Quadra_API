@@ -1,14 +1,16 @@
 {
   "status": "success",
-  "timestamp": "2026-05-14T19:37:43Z",
+  "timestamp": "2026-05-14T19:49:14Z",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
-    "USD": " 508,60040000 ",
-    "EUR": " 596,60352721 ",
-    "USDT": "659.966"
+    "USD": "510.78730000",
+    "EUR": "598.12171255",
+    "USDT": "DEBUG - Consultando Binance...
+DEBUG - Tasa Binance: 0
+0"
   },
   "cache_info": {
-    "bcv_source": "live_failed"
+    "bcv_source": "live_updated"
   }
 }
