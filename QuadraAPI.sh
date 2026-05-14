@@ -76,6 +76,7 @@ validar_tasas_desactualizadas() {
 
 obtener_tasas_bcv() {
     local -n rates_ref=$1
+    echo "DEBUG - Descargando HTML del BCV..."
     local contenido=$(curl -ksl --retry 3 --connect-timeout 10 "$BCV_URL")
     
     # Verificar si se obtuvo contenido
@@ -84,24 +85,23 @@ obtener_tasas_bcv() {
         return 1
     fi
     
-    # Extraer TODOS los contenidos de strong tags de forma robusta
-    local tasas=$(echo "$contenido" | grep -o '<strong>[^<]*</strong>' | sed 's/<[^>]*>//g')
+    echo "DEBUG - HTML descargado (tamaño: ${#contenido} bytes)"
     
-    # Buscar tasas usando diferentes estrategias
-    local tasa_dolar=""
-    local tasa_euro=""
+    # Extraer tasas usando los IDs específicos del HTML actual
+    # Buscar el contenedor del dólar que tiene id="dolar"
+    local tasa_dolar=$(echo "$contenido" | grep -A 20 'id="dolar"' | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g' | head -1)
     
-    # Estrategia 1: Buscar números con formato ###.###,@@
-    tasa_dolar=$(echo "$tasas" | grep -E '[0-9]{1,3}[.,][0-9]{2,}' | head -1)
-    tasa_euro=$(echo "$tasas" | grep -E '[0-9]{1,3}[.,][0-9]{2,}' | tail -1)
+    # Buscar el contenedor del euro que tiene id="euro"
+    local tasa_euro=$(echo "$contenido" | grep -A 20 'id="euro"' | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g' | head -1)
     
-    # Estrategia 2: Si no funciona, usar posiciones específicas (basado en estructura conocida)
-    if [ -z "$tasa_dolar" ]; then
-        tasa_dolar=$(echo "$tasas" | awk 'NR==7')
-    fi
-    
-    if [ -z "$tasa_euro" ]; then
-        tasa_euro=$(echo "$tasas" | awk 'NR==3')
+    # Fallback: buscar cualquier strong con class strong-tb
+    if [ -z "$tasa_dolar" ] || [ -z "$tasa_euro" ]; then
+        echo "DEBUG - Usando fallback: buscando strong class='strong-tb'"
+        local todas_tasas=$(echo "$contenido" | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g')
+        
+        # En el HTML, el EUR aparece primero, luego el USD
+        tasa_euro=$(echo "$todas_tasas" | sed -n '1p')
+        tasa_dolar=$(echo "$todas_tasas" | sed -n '2p')
     fi
     
     # Limpiar las tasas encontradas
@@ -115,8 +115,10 @@ obtener_tasas_bcv() {
     
     rates_ref=("$tasa_dolar" "$tasa_euro")
     
+    echo "DEBUG - Tasas encontradas: USD='$tasa_dolar', EUR='$tasa_euro'"
+    
     if [ -n "$tasa_dolar" ] && [ -n "$tasa_euro" ] && [ "$tasa_dolar" != "0" ] && [ "$tasa_euro" != "0" ]; then
-        echo "Tasas BCV obtenidas - USD: $tasa_dolar, EUR: $tasa_euro"
+        echo "✓ Tasas BCV obtenidas correctamente"
         return 0
     fi
     
@@ -125,6 +127,7 @@ obtener_tasas_bcv() {
 }
 
 obtener_tasa_binance() {
+    echo "DEBUG - Consultando Binance..."
     local response=$(curl -s -X POST "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search" \
         -H "Content-Type: application/json" \
         -H "Accept-Encoding: gzip" \
@@ -138,7 +141,9 @@ obtener_tasa_binance() {
     local tasa=$(echo "$response" | jq -r '.data[].adv.price' 2>/dev/null | \
         awk 'NR==1 || NR==2 || NR==3 {sum+=$1; count++} END {if(count>0) printf "%.3f", sum/count; else print "0"}')
     
-    echo "${tasa:-0}"
+    local resultado="${tasa:-0}"
+    echo "DEBUG - Tasa Binance: $resultado"
+    echo "$resultado"
 }
 
 # CARGAR DATOS EXISTENTES PARA PRESERVAR
@@ -146,6 +151,7 @@ cargar_json_existente() {
     local -n dolar_ref=$1 euro_ref=$2 usdt_ref=$3 timestamp_ref=$4 bcv_source_ref=$5
     
     if [[ -f $ARCHIVO_SALIDA ]]; then
+        echo "DEBUG - Cargando JSON existente desde $ARCHIVO_SALIDA"
         dolar_ref=$(jq -r '.rates.USD' $ARCHIVO_SALIDA 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || echo "0")
         euro_ref=$(jq -r '.rates.EUR' $ARCHIVO_SALIDA 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || echo "0")
         usdt_ref=$(jq -r '.rates.USDT' $ARCHIVO_SALIDA 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || echo "0")
@@ -157,8 +163,10 @@ cargar_json_existente() {
         euro_ref=$(limpiar_y_normalizar "$euro_ref")
         usdt_ref=$(limpiar_y_normalizar "$usdt_ref")
         
+        echo "DEBUG - Datos cargados: USD=$dolar_ref, EUR=$euro_ref, USDT=$usdt_ref"
         return 0
     fi
+    echo "DEBUG - No existe archivo JSON previo"
     return 1
 }
 
@@ -186,6 +194,7 @@ crear_json_salida() {
   }
 }
 EOF
+    echo "DEBUG - JSON guardado en $ARCHIVO_SALIDA"
 }
 
 main() {
@@ -193,6 +202,7 @@ main() {
     
     echo "=== INICIANDO ACTUALIZACIÓN DE TASAS ==="
     echo "Hora actual Venezuela: $(TZ='America/Caracas' date)"
+    echo "Hora actual UTC: $(date -u)"
     
     # Cargar valores existentes del JSON (si existe)
     if ! cargar_json_existente dolar euro usdt timestamp bcv_source; then
@@ -211,15 +221,17 @@ main() {
     local nueva_tasa_binance=$(obtener_tasa_binance)
     if [[ "$nueva_tasa_binance" != "0" && "$nueva_tasa_binance" != "0.000" ]]; then
         usdt="$nueva_tasa_binance"
-        echo "Binance actualizado: $usdt"
+        echo "✓ Binance actualizado: $usdt"
     else
-        echo "Manteniendo tasa Binance anterior: $usdt"
+        echo "⚠️ Manteniendo tasa Binance anterior: $usdt"
     fi
     
     # Manejar tasas BCV según horario y validación
     echo "--- MANEJANDO TASAS BCV ---"
     rates_bcv=("" "")
     local actualizar_bcv_horario=$(debe_actualizar_bcv)
+    
+    echo "DEBUG - ¿Estamos en horario BCV? $actualizar_bcv_horario (horas permitidas: 4, 9, 12)"
     
     if $actualizar_bcv_horario; then
         echo "Horario BCV detectado (4:00 AM, 9:00 AM o 12:00 PM), obteniendo tasas actuales..."
@@ -261,6 +273,9 @@ main() {
     echo "USDT: $usdt"
     echo "Fuente BCV: $bcv_source"
     echo "Timestamp: $timestamp"
+    echo ""
+    echo "--- JSON GENERADO ---"
+    cat "$ARCHIVO_SALIDA"
 }
 
 main "$@"
