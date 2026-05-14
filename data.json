@@ -1,12 +1,12 @@
 {
   "status": "success",
-  "timestamp": "2026-05-14T02:11:56Z",
+  "timestamp": "2026-05-14T06:40:49Z",
   "base_currency": "USD/EUR/USDT",
   "target_currency": "BS / VES",
   "rates": {
     "USD": " 508,60040000 ",
     "EUR": " 596,60352721 ",
-    "USDT": "660.886"
+    "USDT": "661.667"
   },
   "cache_info": {
     "bcv_source": "live_failed"
