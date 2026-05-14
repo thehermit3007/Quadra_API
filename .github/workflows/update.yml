@@ -13,12 +13,16 @@ jobs:
   update-rates:
     runs-on: ubuntu-latest
     
+    # 👇 AGREGAR ESTO para usar Node.js 24 ahora mismo
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    
     steps:
       - name: Setup timezone
         run: sudo timedatectl set-timezone America/Caracas
         
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4  # Sigue siendo v4, pero la variable de arriba la fuerza a usar Node 24
         with:
           token: ${{ secrets.PAT }}
           fetch-depth: 0
