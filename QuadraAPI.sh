@@ -10,10 +10,19 @@ debe_actualizar_bcv() {
     [[ $hora_actual == "4" || $hora_actual == "9" || $hora_actual == "12" ]]
 }
 
-# Función para normalizar formato numérico (coma a punto)
+# Función para normalizar formato numérico
+# Maneja: punto como separador de miles, coma como separador decimal
+# Ejemplo: "1.234,56" -> "1234.56"
 normalizar_numero() {
     local numero="$1"
-    echo "$numero" | tr ',' '.'
+    # Dejar solo dígitos, comas, puntos y signo menos
+    # Eliminar todos los puntos (separadores de miles)
+    # Convertir coma decimal a punto
+    echo "$numero" \
+        | tr -d ' \t\n\r' \
+        | sed 's/[^0-9,.-]//g' \
+        | sed 's/\.//g' \
+        | sed 's/,/./g'
 }
 
 # Nueva función: Validar si las tasas BCV están desactualizadas
@@ -23,7 +32,7 @@ validar_tasas_desactualizadas() {
     local tasa_dolar_json=$3
     local tasa_euro_json=$4
     
-    # Normalizar formatos (coma a punto)
+    # Normalizar formatos (punto de miles + coma decimal)
     local dolar_actual_num=$(normalizar_numero "$tasa_dolar_actual")
     local euro_actual_num=$(normalizar_numero "$tasa_euro_actual")
     local dolar_json_num=$(normalizar_numero "$tasa_dolar_json")
@@ -33,10 +42,12 @@ validar_tasas_desactualizadas() {
     echo "DEBUG - USD Actual: $dolar_actual_num | USD JSON: $dolar_json_num"
     echo "DEBUG - EUR Actual: $euro_actual_num | EUR JSON: $euro_json_num"
     
-    # Si alguna tasa es 0 o vacía, considerar desactualizado
+    # Si alguna tasa es 0, vacía o no numérica, considerar desactualizado
     if [[ -z "$dolar_json_num" || "$dolar_json_num" == "0" || \
-          -z "$euro_json_num" || "$euro_json_num" == "0" ]]; then
-        echo "✓ Tasas BCV en JSON inválidas, se requiere actualización"
+          -z "$euro_json_num" || "$euro_json_num" == "0" || \
+          -z "$dolar_actual_num" || "$dolar_actual_num" == "0" || \
+          -z "$euro_actual_num" || "$euro_actual_num" == "0" ]]; then
+        echo "✓ Tasas BCV inválidas o en cero, se requiere actualización"
         return 0
     fi
     
@@ -62,14 +73,14 @@ obtener_tasas_bcv() {
     local contenido=$(curl -ksl --retry 3 --connect-timeout 10 "$BCV_URL")
     
     # Extraer tasas usando los IDs específicos del HTML actual
-    local tasa_dolar=$(echo "$contenido" | grep -A 20 'id="dolar"' | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g' | head -1)
-    local tasa_euro=$(echo "$contenido" | grep -A 20 'id="euro"' | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g' | head -1)
+    local tasa_dolar=$(echo "$contenido" | grep -A 20 'id="dolar"' | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g' | head -1 | xargs)
+    local tasa_euro=$(echo "$contenido" | grep -A 20 'id="euro"' | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g' | head -1 | xargs)
     
     # Fallback por si no encuentra con IDs (usa strong class strong-tb)
     if [ -z "$tasa_dolar" ] || [ -z "$tasa_euro" ]; then
         local todas_tasas=$(echo "$contenido" | grep -o '<strong class="strong-tb">[^<]*</strong>' | sed 's/<[^>]*>//g')
-        tasa_euro=$(echo "$todas_tasas" | sed -n '1p')
-        tasa_dolar=$(echo "$todas_tasas" | sed -n '2p')
+        tasa_euro=$(echo "$todas_tasas" | sed -n '1p' | xargs)
+        tasa_dolar=$(echo "$todas_tasas" | sed -n '2p' | xargs)
     fi
     
     rates_ref=("$tasa_dolar" "$tasa_euro")
@@ -171,8 +182,9 @@ main() {
             
             # Validar si las tasas están desactualizadas
             if validar_tasas_desactualizadas "$tasa_dolar_actual" "$tasa_euro_actual" "$dolar" "$euro"; then
-                dolar="$tasa_dolar_actual"
-                euro="$tasa_euro_actual"
+                # Guardar en formato normalizado (punto decimal) para consistencia en el JSON
+                dolar=$(normalizar_numero "$tasa_dolar_actual")
+                euro=$(normalizar_numero "$tasa_euro_actual")
                 bcv_source="live_updated"
                 echo "✓ Tasas BCV actualizadas por cambio significativo"
             else
